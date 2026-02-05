@@ -29,17 +29,17 @@ def get_movie_details(url):
         print(response.text)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        dir_tag = soup.find('meta', attrs={'name': 'twitter:data1'})
-        director = dir_tag['content'] if dir_tag else "Unknown"
-        
-        # 2. Genres (Pulling from the script tags or details)
-        # Finding genres in the provided HTML: Thriller, Drama
-        genres = [a.text for a in soup.select('a[href*="/genre/"]')]
-        
-        # 3. Top 3 Actors (Using the text-slug class found in your file)
-        actors = [a.get_text() for a in soup.select('.cast-list a.text-slug')[:3]]
-        
-        return director, genres, actors
+    dir_tag = soup.find('meta', attrs={'name': 'twitter:data1'})
+    director = dir_tag['content'] if dir_tag else "Unknown"
+    
+    # 2. Genres (Pulling from the script tags or details)
+    # Finding genres in the provided HTML: Thriller, Drama
+    genres = [a.text for a in soup.select('a[href*="/genre/"]')]
+    
+    # 3. Top 3 Actors (Using the text-slug class found in your file)
+    actors = [a.get_text() for a in soup.select('.cast-list a.text-slug')[:3]]
+    
+    return director, genres, actors
         
     except:
         return "Unknown", [], []
