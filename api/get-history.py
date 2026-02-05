@@ -5,31 +5,23 @@ from flask import Flask, request, jsonify
 import re
 from datetime import datetime
 import time
-from collections import Counter
 
 app = Flask(__name__)
 
-# Simple in-memory cache
-# Format: { 'film_url': {'director': '...', 'genres': [...], 'actors': [...] } }
+# In-memory cache to prevent redundant scraping
 movie_cache = {}
 
-def get_clean_film_url(entry):
-    original_link = entry.link
-    # Remove username/review segments and rewatch counters
-    url = re.sub(r'letterboxd\.com\/[^\/]+\/film\/', 'letterboxd.com/film/', original_link)
-    url = re.sub(r'(film\/[a-z0-9-]+\/)\d+\/?$', r'\1', url)
-    return url
-
 def get_movie_details(url):
-    # Check cache first
+    """Scrapes Director, Genres, and Top 3 Actors from a Letterboxd film page."""
     if url in movie_cache:
-        return movie_cache[url]['director'], movie_cache[url]['genres'], movie_cache[url]['actors']
+        return movie_cache[url]
 
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0'}
     try:
-        response = requests.get(url, headers=headers, timeout=5)
+        # Timeout is low (3s) to prevent the whole API from hanging
+        response = requests.get(url, headers=headers, timeout=3)
         if response.status_code != 200:
-            return "Unknown", [], []
+            return {"director": "Unknown", "genres": [], "actors": []}
             
         soup = BeautifulSoup(response.text, 'html.parser')
         
@@ -43,58 +35,79 @@ def get_movie_details(url):
         # 3. Actors (Top 3)
         actors = [a.get_text() for a in soup.select('.cast-list a.text-slug')[:3]]
         
-        # Save to cache
-        movie_cache[url] = {
-            'director': director,
-            'genres': genres,
-            'actors': actors
+        data = {
+            "director": director,
+            "genres": genres,
+            "actors": actors
         }
         
-        return director, genres, actors
-    except Exception as e:
-        print(f"Scraping error for {url}: {e}")
-        return "Unknown", [], []
-
-from collections import Counter
+        movie_cache[url] = data
+        return data
+    except Exception:
+        return {"director": "Unknown", "genres": [], "actors": []}
 
 @app.route('/api/get-history')
 def get_history():
     username = request.args.get('username')
     since_param = request.args.get('since')
     
+    if not username:
+        return jsonify({"error": "Username required"}), 400
+
     try:
-        raw_rss = requests.get(f"https://letterboxd.com/{username}/rss/").text.strip()
-        feed = feedparser.parse(raw_rss)
-    except:
-        return jsonify({"error": "Failed to fetch feed"}), 500
+        # Letterboxd RSS often has a leading blank line; .strip() fixes feedparser issues
+        rss_url = f"https://letterboxd.com/{username}/rss/"
+        response = requests.get(rss_url, timeout=5)
+        feed_content = response.text.strip()
+        feed = feedparser.parse(feed_content)
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch feed: {str(e)}"}), 500
     
-    since_date = datetime.strptime(since_param, '%Y-%m-%d') if since_param else None
+    since_date = None
+    if since_param:
+        try:
+            since_date = datetime.strptime(since_param, '%Y-%m-%d')
+        except ValueError:
+            pass
+
     results = []
     
-    for entry in feed.entries:
-        pub_date = datetime.fromtimestamp(time.mktime(entry.published_parsed))
+    # We limit to the last 10 entries to ensure the request finishes before Vercel times out
+    for entry in feed.entries[:10]:
+        # 1. Date Filtering
+        try:
+            pub_date = datetime.fromtimestamp(time.mktime(entry.published_parsed))
+        except:
+            pub_date = datetime.now()
+
         if since_date and pub_date < since_date:
             continue
 
-        # Get Title and Filter Unknowns
+        # 2. Get and Clean Title
+        # Fallback logic: Namespace tag -> standard title -> regex cleanup
         title = getattr(entry, 'letterboxd_filmtitle', entry.title)
         title = re.sub(r', \d{4} - ★+.*$', '', title).replace('Watched by ', '').strip()
         
         if not title or title.lower() == "unknown":
             continue
 
-        film_url = get_clean_film_url(entry)
-        director, genres, actors = get_movie_details(film_url)
+        # 3. URL Cleaning (to point to the film page, not the review)
+        film_url = re.sub(r'letterboxd\.com\/[^\/]+\/film\/', 'letterboxd.com/film/', entry.link)
+        film_url = re.sub(r'(film\/[a-z0-9-]+\/)\d+\/?$', r'\1', film_url)
+        
+        # 4. Scrape Details (or pull from cache)
+        details = get_movie_details(film_url)
         
         results.append({
             "title": title,
             "rating": getattr(entry, 'letterboxd_memberrating', None),
-            "director": director,
-            "genres": genres,
-            "actors": actors
+            "date": pub_date.strftime('%Y-%m-%d'),
+            "director": details['director'],
+            "genres": details['genres'],
+            "actors": details['actors']
         })
     
     return jsonify(results)
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True)
