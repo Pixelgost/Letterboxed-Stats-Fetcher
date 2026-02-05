@@ -8,59 +8,63 @@ app = Flask(__name__)
 
 def get_movie_details(url):
     try:
-        # We add a timeout so the scraper doesn't hang forever
-        response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+        # Strict timeout of 2 seconds per movie to avoid 500 error
+        response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=2)
+        if response.status_code != 200:
+            return "Unknown", [], []
+            
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Letterboxd specific selectors
-        director = soup.find('span', {'class': 'directorlist'})
-        director_text = director.get_text(strip=True) if director else "Unknown"
+        # Director
+        director_tag = soup.find('span', {'class': 'directorlist'})
+        director = director_tag.get_text(strip=True) if director_tag else "Unknown"
         
-        # Extract Genres from the 'tab-details' section
+        # Genres - Updated selector to be more robust
         genre_links = soup.select('a[href*="/genre/"]')
-        genres = list(set([g.get_text(strip=True) for g in genre_links])) if genre_links else ["Unknown"]
+        genres = list(set([g.get_text(strip=True) for g in genre_links])) if genre_links else []
         
-        # Extract Actors
+        # Actors
         actor_links = soup.select('.cast-list .cast-list-link')[:3]
-        actors = [a.get_text(strip=True) for a in actor_links] if actor_links else ["Unknown"]
+        actors = [a.get_text(strip=True) for a in actor_links] if actor_links else []
         
-        return director_text, genres, actors
-    except Exception as e:
-        print(f"Scraping error for {url}: {e}")
-        return "Unknown", ["Unknown"], ["Unknown"]
+        return director, genres, actors
+    except Exception:
+        return "Unknown", [], []
 
 @app.route('/api/get-history')
 def get_history():
-    username = request.args.get('username')
-    since_date = request.args.get('since')
-    
-    if not username:
-        return jsonify({"error": "Username is required"}), 400
+    try:
+        username = request.args.get('username')
+        since_date = request.args.get('since', '')
+        
+        feed_url = f"https://letterboxd.com/{username}/rss/"
+        feed = feedparser.parse(feed_url)
+        
+        if not feed.entries:
+            return jsonify([])
 
-    feed_url = f"https://letterboxd.com/{username}/rss/"
-    feed = feedparser.parse(feed_url)
-    
-    results = []
-    # LIMITING TO 10 RECENT MOVIES to prevent timeout during scraping
-    entries = feed.entries[:10] 
+        results = []
+        # LIMIT to 5 entries initially to test if it bypasses the 500 error
+        # Scraping is slow; 5 entries = ~5-7 seconds
+        for entry in feed.entries[:5]:
+            watch_date = getattr(entry, 'letterboxd_watched_date', '')
+            if since_date and watch_date and watch_date < since_date:
+                continue
 
-    for entry in entries:
-        watch_date = getattr(entry, 'letterboxd_watched_date', None)
-        if since_date and watch_date and watch_date < since_date:
-            continue
+            # This is the slow part
+            director, genres, actors = get_movie_details(entry.link)
 
-        # Get the extra data
-        director, genres, actors = get_movie_details(entry.link)
-
-        results.append({
-            "title": entry.letterboxd_filmtitle,
-            "rating": getattr(entry, 'letterboxd_memberrating', None),
-            "date": watch_date,
-            "director": director,
-            "genres": genres,
-            "actors": actors
-        })
-        # Small sleep to be polite to Letterboxd servers
-        time.sleep(0.1)
-    
-    return jsonify(results)
+            results.append({
+                "title": getattr(entry, 'letterboxd_filmtitle', 'Unknown'),
+                "rating": getattr(entry, 'letterboxd_memberrating', None),
+                "date": watch_date,
+                "director": director,
+                "genres": genres,
+                "actors": actors
+            })
+        
+        return jsonify(results)
+        
+    except Exception as e:
+        # This catches the error and returns it as JSON so your JS doesn't crash
+        return jsonify({"error": str(e)}), 500
