@@ -56,6 +56,7 @@ def get_history():
     # Limit to 5 for speed/stability during testing
     for entry in feed.entries[:5]:
         film_url = get_clean_film_url(entry)
+        print(film_url )
         director, genres, actors = get_movie_details(film_url)
         
         results.append({
