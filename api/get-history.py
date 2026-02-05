@@ -5,6 +5,7 @@ from flask import Flask, request, jsonify
 import re
 from datetime import datetime
 import time
+from collections import Counter
 
 app = Flask(__name__)
 
@@ -54,42 +55,40 @@ def get_movie_details(url):
         print(f"Scraping error for {url}: {e}")
         return "Unknown", [], []
 
+from collections import Counter
+
 @app.route('/api/get-history')
 def get_history():
     username = request.args.get('username')
-    since_param = request.args.get('since') # Format: YYYY-MM-DD
+    since_param = request.args.get('since')
     
-    if not username:
-        return jsonify({"error": "Username required"}), 400
-
-    feed = feedparser.parse(f"https://letterboxd.com/{username}/rss/")
+    try:
+        raw_rss = requests.get(f"https://letterboxd.com/{username}/rss/").text.strip()
+        feed = feedparser.parse(raw_rss)
+    except:
+        return jsonify({"error": "Failed to fetch feed"}), 500
     
-    # Parse the 'since' date if provided
-    since_date = None
-    if since_param:
-        try:
-            since_date = datetime.strptime(since_param, '%Y-%m-%d')
-        except ValueError:
-            pass
-
+    since_date = datetime.strptime(since_param, '%Y-%m-%d') if since_param else None
     results = []
     
     for entry in feed.entries:
-        # 1. Date Filtering
-        # published_parsed is a time.struct_time
         pub_date = datetime.fromtimestamp(time.mktime(entry.published_parsed))
-        
         if since_date and pub_date < since_date:
-            continue # Skip movies older than the selected date
+            continue
 
-        # 2. Get Data
+        # Get Title and Filter Unknowns
+        title = getattr(entry, 'letterboxd_filmtitle', entry.title)
+        title = re.sub(r', \d{4} - ★+.*$', '', title).replace('Watched by ', '').strip()
+        
+        if not title or title.lower() == "unknown":
+            continue
+
         film_url = get_clean_film_url(entry)
         director, genres, actors = get_movie_details(film_url)
         
         results.append({
-            "title": getattr(entry, 'letterboxd_filmtitle', 'Unknown'),
+            "title": title,
             "rating": getattr(entry, 'letterboxd_memberrating', None),
-            "date": pub_date.strftime('%Y-%m-%d'),
             "director": director,
             "genres": genres,
             "actors": actors
