@@ -100,9 +100,9 @@
 
                 const watchCounts = {}; 
                 const ratingsMap = {};
-                console.log(userData)
                 results.forEach((userData) => {
                     userData.forEach(movie => {
+                        console.log(movie)
                         const title = movie.letterboxd_filmtitle || movie.title;
                         watchCounts[title] = (watchCounts[title] || 0) + 1;
                         
