@@ -60,7 +60,7 @@ def get_history():
     results = []
     
     # FIX: Added [:10] to the slice
-    for entry in feed.entries[:10]:
+    for entry in feed.entries[]:
         try:
             pub_date = datetime.fromtimestamp(time.mktime(entry.published_parsed))
         except:
@@ -93,6 +93,3 @@ def get_history():
         })
         
     return jsonify(results)
-
-if __name__ == '__main__':
-    app.run(debug=True)
