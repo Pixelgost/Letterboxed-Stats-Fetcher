@@ -2,69 +2,65 @@ import feedparser
 import requests
 from bs4 import BeautifulSoup
 from flask import Flask, request, jsonify
-import time
+from flask_cors import CORS # You might need: pip install flask-cors
 
 app = Flask(__name__)
+CORS(app) # This prevents the "CORS Error" when running locally
 
 def get_movie_details(url):
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+    }
     try:
-        # Strict timeout of 2 seconds per movie to avoid 500 error
-        response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=2)
-        if response.status_code != 200:
-            return "Unknown", [], []
-            
+        print(f"Scraping: {url}")
+        response = requests.get(url, headers=headers, timeout=5)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Director
-        director_tag = soup.find('span', {'class': 'directorlist'})
-        director = director_tag.get_text(strip=True) if director_tag else "Unknown"
+        # 1. Get Director (Selector updated)
+        director_tag = soup.select_one('span.directorlist a')
+        director = director_tag.get_text(strip=True) if director_tag else "Unknown Director"
         
-        # Genres - Updated selector to be more robust
-        genre_links = soup.select('a[href*="/genre/"]')
-        genres = list(set([g.get_text(strip=True) for g in genre_links])) if genre_links else []
+        # 2. Get Genres (Selector updated)
+        genre_tags = soup.select('div#tab-details a[href*="/genre/"]')
+        genres = [g.get_text(strip=True) for g in genre_tags] if genre_tags else ["Unknown Genre"]
         
-        # Actors
-        actor_links = soup.select('.cast-list .cast-list-link')[:3]
-        actors = [a.get_text(strip=True) for a in actor_links] if actor_links else []
+        # 3. Get Actors
+        actor_tags = soup.select('div.cast-list a.cast-list-link')[:3]
+        actors = [a.get_text(strip=True) for a in actor_tags] if actor_tags else ["Unknown Cast"]
         
-        return director, genres, actors
-    except Exception:
-        return "Unknown", [], []
+        return director, list(set(genres)), actors
+    except Exception as e:
+        print(f"Error scraping {url}: {e}")
+        return "Error", [], []
 
 @app.route('/api/get-history')
 def get_history():
-    try:
-        username = request.args.get('username')
-        since_date = request.args.get('since', '')
-        
-        feed_url = f"https://letterboxd.com/{username}/rss/"
-        feed = feedparser.parse(feed_url)
-        
-        if not feed.entries:
-            return jsonify([])
+    username = request.args.get('username')
+    print(f"--- Fetching for user: {username} ---")
+    
+    feed_url = f"https://letterboxd.com/{username}/rss/"
+    feed = feedparser.parse(feed_url)
+    
+    if not feed.entries:
+        print("No entries found in RSS feed. Is the username correct?")
+        return jsonify([])
 
-        results = []
-        # LIMIT to 5 entries initially to test if it bypasses the 500 error
-        # Scraping is slow; 5 entries = ~5-7 seconds
-        for entry in feed.entries[:5]:
-            watch_date = getattr(entry, 'letterboxd_watched_date', '')
-            if since_date and watch_date and watch_date < since_date:
-                continue
-
-            # This is the slow part
-            director, genres, actors = get_movie_details(entry.link)
-
-            results.append({
-                "title": getattr(entry, 'letterboxd_filmtitle', 'Unknown'),
-                "rating": getattr(entry, 'letterboxd_memberrating', None),
-                "date": watch_date,
-                "director": director,
-                "genres": genres,
-                "actors": actors
-            })
+    results = []
+    # Test with just the first 3 movies to see if data populates
+    for entry in feed.entries[:3]:
+        print(f"Found movie: {entry.get('letterboxd_filmtitle', 'Unknown')}")
         
-        return jsonify(results)
-        
-    except Exception as e:
-        # This catches the error and returns it as JSON so your JS doesn't crash
-        return jsonify({"error": str(e)}), 500
+        director, genres, actors = get_movie_details(entry.link)
+
+        results.append({
+            "title": entry.get('letterboxd_filmtitle', 'Unknown'),
+            "rating": entry.get('letterboxd_memberrating', None),
+            "director": director,
+            "genres": genres,
+            "actors": actors
+        })
+    
+    return jsonify(results)
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)
