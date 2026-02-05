@@ -180,6 +180,7 @@
                     status.innerText = "No activity found.";
                     return;
                 }
+                console.log(genreCounts)
 
                 renderDashboard(statsArray, genreCounts, directorCounts, actorCounts);
                 document.getElementById('dashboard').classList.remove('hidden');
@@ -268,9 +269,24 @@
         }
 
         function renderChart(genreData) {
-            const ctx = document.getElementById('genreChart').getContext('2d');
+            console.log(genreData)
+            const canvas = document.getElementById('genreChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
             if (myChart) myChart.destroy();
+
             const sorted = Object.entries(genreData).sort((a,b) => b[1] - a[1]).slice(0, 7);
+            
+            // Fallback if no genre data exists
+            if (sorted.length === 0) {
+                ctx.font = "12px Inter";
+                ctx.fillStyle = "#6b7280";
+                ctx.textAlign = "center";
+                ctx.fillText("No genre data available", canvas.width/2, canvas.height/2);
+                return;
+            }
+
             myChart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
@@ -287,7 +303,14 @@
                     maintainAspectRatio: false,
                     cutout: '75%',
                     plugins: {
-                        legend: { position: 'right', labels: { color: '#9ca3af', font: { weight: 'bold', size: 11 }, padding: 15 } }
+                        legend: { 
+                            position: 'right', 
+                            labels: { 
+                                color: '#9ca3af', 
+                                font: { weight: 'bold', size: 11 }, 
+                                padding: 15 
+                            } 
+                        }
                     }
                 }
             });
