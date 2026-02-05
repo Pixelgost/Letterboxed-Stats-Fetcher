@@ -6,16 +6,20 @@ import re
 
 app = Flask(__name__)
 
+
 def get_clean_film_url(entry):
-    """
-    Converts 'https://letterboxd.com/username/film/title/' 
-    to 'https://letterboxd.com/film/title/'
-    """
     original_link = entry.link
-    # Regex to remove the username part of the path
-    # Matches letterboxd.com/ [any-username] /film/
-    clean_url = re.sub(r'letterboxd\.com\/[^\/]+\/film\/', 'letterboxd.com/film/', original_link)
-    return clean_url
+    # Step 1: Remove the username segment
+    # From: https://letterboxd.com/username/film/slug/
+    # To:   https://letterboxd.com/film/slug/
+    url = re.sub(r'letterboxd\.com\/[^\/]+\/film\/', 'letterboxd.com/film/', original_link)
+    
+    # Step 2: Remove trailing rewatch counter (e.g., /1/)
+    # We look for a slash, followed by digits, followed by a trailing slash
+    # The [a-z0-9-]+ ensures we are looking at a film slug first
+    url = re.sub(r'(film\/[a-z0-9-]+\/)\d+\/?$', r'\1', url)
+    
+    return url
 
 def get_movie_details(url):
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/119.0.0.0'}
@@ -25,25 +29,18 @@ def get_movie_details(url):
         print(response.text)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # 1. Director - specific meta/span check
-        dir_tag = soup.select_one('meta[name="twitter:data1"]') 
-        # Letterboxd often puts the director in a twitter meta tag 'data1'
+        dir_tag = soup.find('meta', attrs={'name': 'twitter:data1'})
         director = dir_tag['content'] if dir_tag else "Unknown"
         
-        if director == "Unknown":
-            # Fallback to standard selector
-            dir_link = soup.select_one('span.directorlist a')
-            director = dir_link.get_text() if dir_link else "Unknown"
-
-        # 2. Genres
-        genre_links = soup.select('div#tab-details a[href*="/genre/"]')
-        genres = list(set([g.get_text(strip=True) for g in genre_links]))
+        # 2. Genres (Pulling from the script tags or details)
+        # Finding genres in the provided HTML: Thriller, Drama
+        genres = [a.text for a in soup.select('a[href*="/genre/"]')]
         
-        # 3. Actors
-        actor_links = soup.select('.cast-list a.cast-list-link')[:3]
-        actors = [a.get_text(strip=True) for a in actor_links]
+        # 3. Top 3 Actors (Using the text-slug class found in your file)
+        actors = [a.get_text() for a in soup.select('.cast-list a.text-slug')[:3]]
         
         return director, genres, actors
+        
     except:
         return "Unknown", [], []
 
