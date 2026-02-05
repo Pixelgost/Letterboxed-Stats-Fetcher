@@ -1,52 +1,166 @@
 <!DOCTYPE html>
-
-<html id="html" lang="en" class="context-client-unknown no-mobile no-js">
+<html lang="en">
 <head>
-	<meta charset="UTF-8">
-	
-	<meta name="viewport" content="width=1024">
-	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-	<meta name="description" content="Released after being wrongfully convicted and imprisoned for 13 years, a woman begins executing her elaborate plan of retribution.">
-	<meta property="og:type" content="video.movie">
-	
-	<meta property="og:url" content="https://letterboxd.com/film/lady-vengeance/">
-	<meta property="og:title" content="Lady Vengeance (2005)">
-	<meta property="og:description" content="Released after being wrongfully convicted and imprisoned for 13 years, a woman begins executing her elaborate plan of retribution.">
-	<meta property="og:image" content="https://a.ltrbxd.com/resized/sm/upload/5x/no/g7/ta/sympathy-for-lady-vengeance-1200-1200-675-675-crop-000000.jpg?v=a5c1fd7bea"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="675">
-	
-	<meta property="fb:app_id" content="173683136069040">
-	<meta name="twitter:card" content="summary_large_image">
-	<meta name="twitter:site" content="@letterboxd"><meta name="twitter:url" content="https://letterboxd.com/film/lady-vengeance/">
-	<meta name="twitter:title" content="Lady Vengeance (2005)">
-	<meta name="twitter:description" content="Released after being wrongfully convicted and imprisoned for 13 years, a woman begins executing her elaborate plan of retribution.">
-	<meta name="twitter:label1" content="Directed by"><meta name="twitter:data1" content="Park Chan-wook">
-	<meta name="twitter:label2" content="Average rating"><meta name="twitter:data2" content="4.05 out of 5">
-	<meta name="twitter:image" content="https://a.ltrbxd.com/resized/sm/upload/5x/no/g7/ta/sympathy-for-lady-vengeance-1200-1200-675-675-crop-000000.jpg?v=a5c1fd7bea">
-	<meta name="application-name" content="Letterboxd">
-	<meta name="theme-color" content="#14181C">
-	<meta name="msapplication-TileColor" content="#445566">
-	<meta name="apple-itunes-app" content="app-id=1054271011, affiliate-data=11l5KW, app-argument=https://letterboxd.com/film/lady-vengeance/">
-	<meta name="mobile-web-app-capable" content="yes">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Squad Letterboxd Stats</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #1f2937; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen p-4 md:p-8 font-sans">
+    <div class="max-w-6xl mx-auto">
+        <h1 class="text-4xl font-black mb-8 text-green-400 italic uppercase tracking-tighter">Squad Stats</h1>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div class="lg:col-span-4 space-y-6">
+                <div class="bg-gray-800 p-6 rounded-2xl shadow-2xl border border-gray-700">
+                    <h2 class="text-lg font-bold mb-4 text-gray-300">1. Add Your Crew</h2>
+                    <div id="userInputsContainer" class="max-h-60 overflow-y-auto pr-2 custom-scroll flex flex-col gap-3 mb-6">
+                        <div class="flex gap-2">
+                            <input type="text" placeholder="Username" class="username-input bg-gray-900 p-3 rounded-xl border border-gray-700 focus:outline-none focus:border-green-500 flex-1 text-sm">
+                            <button onclick="addInput()" class="bg-gray-700 hover:bg-gray-600 px-4 rounded-xl transition font-bold">+</button>
+                        </div>
+                    </div>
+                    
+                    <h2 class="text-lg font-bold mb-4 text-gray-300">2. Timeframe</h2>
+                    <input id="sinceDate" type="date" class="w-full bg-gray-900 p-3 rounded-xl border border-gray-700 focus:outline-none mb-6 text-sm">
+                    
+                    <button onclick="fetchAllData()" id="fetchBtn" class="w-full bg-green-600 hover:bg-green-500 py-4 rounded-xl font-black uppercase tracking-widest transition-all shadow-lg shadow-green-900/20">
+                        Generate Report
+                    </button>
+                </div>
+                <div id="status" class="text-center text-sm text-gray-500 font-medium"></div>
+            </div>
 
-	<title>&lrm;Lady Vengeance (2005) directed by Park Chan-wook • Reviews, film + cast &bull; Letterboxd</title>
-	</head>
+            <div id="dashboard" class="lg:col-span-8 space-y-8 hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-gray-800 p-6 rounded-2xl border border-green-500/20 shadow-xl">
+                        <p class="text-gray-500 text-xs font-black uppercase mb-1">Group MVP (Highest Avg)</p>
+                        <div id="highestRated" class="text-xl font-bold text-white truncate">--</div>
+                    </div>
+                    <div class="bg-gray-800 p-6 rounded-2xl border border-blue-500/20 shadow-xl">
+                        <p class="text-gray-500 text-xs font-black uppercase mb-1">Most Watched</p>
+                        <div id="topMovie" class="text-xl font-bold text-white truncate">--</div>
+                    </div>
+                </div>
 
-<body class="film easter-egg-xcx-logo backdropped" data-type="film" data-tmdb-type="movie" data-tmdb-id="4550">
-	<div id="tab-cast" class="tabbed-content-block">
-		<div class="cast-list">
-			<p>
-				<a title="Kim Yang-hee" href="/actor/seo-young-ju/" class="text-slug tooltip">Seo Young-ju</a>
-				<a title="Ko Sun-sook" href="/actor/kim-jin-goo/" class="text-slug tooltip">Kim Jin-goo</a>
-				<a title="Won-mo's Father" href="/actor/kim-ik-tae/" class="text-slug tooltip">Kim Ik-tae</a>
-				</p>
-		</div>
-	</div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-gray-800 p-6 rounded-2xl">
+                        <h3 class="text-green-500 text-xs font-black uppercase mb-4 tracking-widest">🏆 Top 5 Rated</h3>
+                        <div id="top5Rated" class="space-y-3"></div>
+                    </div>
+                    <div class="bg-gray-800 p-6 rounded-2xl">
+                        <h3 class="text-red-500 text-xs font-black uppercase mb-4 tracking-widest">📉 Bottom 5 Rated</h3>
+                        <div id="bottom5Rated" class="space-y-3"></div>
+                    </div>
+                </div>
 
-	<div id="tab-crew" class="tabbed-content-block column-block -crewroles">
-		<h3><span class="crewrole -full">Director</span></h3>
-		<div class="text-sluglist">
-			<p><a href="/director/park-chan-wook/" class="text-slug">Park Chan-wook</a></p>
-		</div>
-		</div>
+                <div class="bg-gray-800 p-6 rounded-2xl">
+                    <h3 class="text-blue-400 text-xs font-black uppercase mb-4 tracking-widest">🔥 Most Popular in Group</h3>
+                    <div id="top5Watched" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function addInput() {
+            const container = document.getElementById('userInputsContainer');
+            const div = document.createElement('div');
+            div.className = "flex gap-2";
+            div.innerHTML = `
+                <input type="text" placeholder="Username" class="username-input bg-gray-900 p-3 rounded-xl border border-gray-700 focus:outline-none focus:border-green-500 flex-1 text-sm">
+                <button onclick="this.parentElement.remove()" class="bg-red-900/30 text-red-400 hover:bg-red-900/50 px-4 rounded-xl transition">×</button>
+            `;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function fetchAllData() {
+            const inputs = document.querySelectorAll('.username-input');
+            const usernames = Array.from(inputs).map(i => i.value.trim()).filter(v => v !== "");
+            const date = document.getElementById('sinceDate').value;
+            const btn = document.getElementById('fetchBtn');
+            const status = document.getElementById('status');
+
+            if (usernames.length === 0) return alert("Enter at least one username!");
+
+            btn.disabled = true;
+            btn.innerText = "Crunching Numbers...";
+            status.innerText = "Fetching RSS feeds...";
+
+            try {
+                const results = await Promise.all(usernames.map(user => 
+                    fetch(`/api/get-history?username=${user}&since=${date}`).then(res => res.json())
+                ));
+                console.log(results)
+
+                const watchCounts = {}; 
+                const ratingsMap = {};
+                results.forEach((userData) => {
+                    userData.forEach(movie => {
+                        const title = movie.letterboxd_filmtitle || movie.title;
+                        watchCounts[title] = (watchCounts[title] || 0) + 1;
+                        
+                        if(movie.letterboxd_memberrating) {
+                            const val = parseFloat(movie.letterboxd_memberrating);
+                            if(!ratingsMap[title]) ratingsMap[title] = [];
+                            ratingsMap[title].push(val);
+                        }
+                    });
+                });
+
+                const stats = Object.keys(watchCounts).map(title => ({
+                    title,
+                    watchCount: watchCounts[title],
+                    avgRating: ratingsMap[title] ? (ratingsMap[title].reduce((a,b)=>a+b,0)/ratingsMap[title].length) : null
+                }));
+
+                if(stats.length === 0) {
+                    status.innerText = "No movies found for this timeframe.";
+                    return;
+                }
+
+                renderDashboard(stats);
+                document.getElementById('dashboard').classList.remove('hidden');
+                status.innerText = "Report Generated!";
+            } catch (err) {
+                status.innerText = "Error: Check API or Usernames.";
+                console.error(err);
+                console.log(err)
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Generate Report";
+            }
+        }
+
+        function renderDashboard(stats) {
+            const rated = stats.filter(s => s.avgRating !== null).sort((a,b) => b.avgRating - a.avgRating);
+            const watched = [...stats].sort((a,b) => b.watchCount - a.watchCount);
+
+            document.getElementById('highestRated').innerText = rated[0]?.title || "N/A";
+            document.getElementById('topMovie').innerText = watched[0]?.title || "N/A";
+
+            renderList('top5Rated', rated.slice(0, 5), 'avgRating', '★');
+            renderList('bottom5Rated', [...rated].reverse().slice(0, 5), 'avgRating', '★');
+            renderList('top5Watched', watched.slice(0, 5), 'watchCount', ' watches');
+        }
+
+        function renderList(id, data, key, unit) {
+            const el = document.getElementById(id);
+            el.innerHTML = data.map((item, i) => `
+                <div class="flex justify-between items-center bg-gray-900/50 p-3 rounded-xl border-l-4 ${id.includes('top5Rated') ? 'border-green-500' : id.includes('bottom') ? 'border-red-500' : 'border-blue-500'}">
+                    <span class="text-sm font-bold truncate pr-4">${i+1}. ${item.title}</span>
+                    <span class="text-sm font-mono font-black text-gray-400 flex-shrink-0">
+                        ${key === 'avgRating' ? item[key].toFixed(1) : item[key]}${unit}
+                    </span>
+                </div>
+            `).join('') || '<p class="text-gray-600 text-xs italic">No data</p>';
+        }
+    </script>
 </body>
 </html>
