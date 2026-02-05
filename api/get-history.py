@@ -60,7 +60,7 @@ def get_history():
     results = []
     
     # FIX: Added [:10] to the slice
-    for entry in feed.entries[]:
+    for entry in feed.entries:
         try:
             pub_date = datetime.fromtimestamp(time.mktime(entry.published_parsed))
         except:
