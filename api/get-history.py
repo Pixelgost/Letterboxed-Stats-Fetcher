@@ -106,7 +106,7 @@ def get_history():
             "genres": details['genres'],
             "actors": details['actors']
         })
-    
+    print(results)
     return jsonify(results)
 
 if __name__ == '__main__':
