@@ -22,7 +22,7 @@ def get_movie_details(url):
     try:
         response = requests.get(url, headers=headers, timeout=5)
         if response.status_code != 200: return "Unknown", [], []
-        
+        print(response.text)
         soup = BeautifulSoup(response.text, 'html.parser')
         
         # 1. Director - specific meta/span check
