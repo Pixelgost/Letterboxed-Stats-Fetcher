@@ -1,178 +1,127 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Group Letterboxd Stats</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        .custom-scroll::-webkit-scrollbar { width: 6px; }
-        .custom-scroll::-webkit-scrollbar-track { background: #1f2937; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 10px; }
-    </style>
-</head>
-<body class="bg-gray-900 text-white min-h-screen p-4 md:p-8">
-    <div class="max-w-5xl mx-auto">
-        <header class="flex justify-between items-center mb-8">
-            <h1 class="text-3xl font-bold text-green-400">Squad Stats</h1>
-            <div id="status" class="text-sm text-gray-500"></div>
-        </header>
-        
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div class="lg:col-span-1 space-y-6">
-                <div class="bg-gray-800 p-6 rounded-xl shadow-xl">
-                    <h2 class="text-xl font-semibold mb-4 text-gray-200">The Crew</h2>
-                    <div id="userInputsContainer" class="max-h-60 overflow-y-auto pr-2 custom-scroll flex flex-col gap-3">
-                        <div class="flex gap-2">
-                            <input type="text" placeholder="Username" class="username-input bg-gray-700 p-2 rounded border border-gray-600 focus:outline-none focus:border-green-500 flex-1">
-                            <button onclick="addInput()" class="bg-gray-600 hover:bg-gray-500 px-4 rounded transition">+</button>
-                        </div>
-                    </div>
-                    
-                    <div class="mt-6">
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Since Date</label>
-                        <input id="sinceDate" type="date" class="w-full bg-gray-700 p-2 rounded border border-gray-600 focus:outline-none mb-4">
-                        <button onclick="fetchAllData()" id="fetchBtn" class="w-full bg-green-600 hover:bg-green-500 py-3 rounded-lg font-bold transition">Generate Report</button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="dashboard" class="lg:col-span-2 space-y-8 hidden">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="bg-gray-800 p-6 rounded-xl">
-                        <h3 class="text-gray-400 text-sm font-bold uppercase mb-4">Group Favorite (Highest Rated)</h3>
-                        <div id="highestRated" class="text-2xl font-bold text-yellow-400">-</div>
-                    </div>
-                    <div id="mostWatchedCard" class="bg-gray-800 p-6 rounded-xl border-2 border-green-500/30">
-                        <h3 class="text-gray-400 text-sm font-bold uppercase mb-4">Most Watched by Group</h3>
-                        <div id="topMovie" class="text-2xl font-bold text-white">Loading...</div>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="bg-gray-800 p-6 rounded-xl">
-                        <h3 class="text-gray-400 text-sm font-bold uppercase mb-4">Genre Distribution</h3>
-                        <canvas id="genreChart"></canvas>
-                    </div>
-                    <div class="bg-gray-800 p-6 rounded-xl">
-                        <h3 class="text-gray-400 text-sm font-bold uppercase mb-4">Busiest Watchers</h3>
-                        <div id="watcherStats" class="space-y-3"></div>
-                    </div>
-                </div>
-            </div>
+<div id="dashboard" class="lg:col-span-2 space-y-8 hidden">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-gray-800 p-6 rounded-xl border border-green-500/20">
+            <h3 class="text-gray-400 text-xs font-bold uppercase mb-2 tracking-widest">Group MVP (Highest Avg)</h3>
+            <div id="highestRated" class="text-2xl font-bold text-green-400">--</div>
         </div>
-
-        <div id="results" class="mt-12 grid gap-4"></div>
+        <div class="bg-gray-800 p-6 rounded-xl border border-blue-500/20">
+            <h3 class="text-gray-400 text-xs font-bold uppercase mb-2 tracking-widest">Most Watched</h3>
+            <div id="topMovie" class="text-2xl font-bold text-blue-400">--</div>
+        </div>
     </div>
 
-    <script>
-        let myChart = null;
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-gray-800 p-5 rounded-xl">
+            <h3 class="text-yellow-500 text-sm font-bold uppercase mb-4 flex items-center gap-2">
+                <span>🏆</span> Top 5 Highest Rated
+            </h3>
+            <div id="top5Rated" class="space-y-2 text-sm"></div>
+        </div>
 
-        function addInput() {
-            const container = document.getElementById('userInputsContainer');
-            const div = document.createElement('div');
-            div.className = "flex gap-2";
-            div.innerHTML = `<input type="text" placeholder="Username" class="username-input bg-gray-700 p-2 rounded border border-gray-600 focus:outline-none focus:border-green-500 flex-1"><button onclick="this.parentElement.remove()" class="bg-red-900/50 hover:bg-red-800 px-4 rounded transition">−</button>`;
-            container.appendChild(div);
-        }
+        <div class="bg-gray-800 p-5 rounded-xl">
+            <h3 class="text-red-500 text-sm font-bold uppercase mb-4 flex items-center gap-2">
+                <span>📉</span> Bottom 5 Lowest Rated
+            </h3>
+            <div id="bottom5Rated" class="space-y-2 text-sm"></div>
+        </div>
+    </div>
 
-        async function fetchAllData() {
-            const inputs = document.querySelectorAll('.username-input');
-            const usernames = Array.from(inputs).map(i => i.value.trim()).filter(v => v !== "");
-            const date = document.getElementById('sinceDate').value;
-            const btn = document.getElementById('fetchBtn');
+    <div class="bg-gray-800 p-5 rounded-xl">
+        <h3 class="text-blue-400 text-sm font-bold uppercase mb-4">🔥 Top 5 Most Watched</h3>
+        <div id="top5Watched" class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm"></div>
+    </div>
+</div>
 
-            if (usernames.length === 0) return;
+<script>
+    // ... keep your addInput function ...
 
-            btn.disabled = true;
-            btn.innerText = "Analyzing Films...";
+    async function fetchAllData() {
+        const inputs = document.querySelectorAll('.username-input');
+        const usernames = Array.from(inputs).map(i => i.value.trim()).filter(v => v !== "");
+        const date = document.getElementById('sinceDate').value;
+        const btn = document.getElementById('fetchBtn');
 
-            try {
-                const results = await Promise.all(usernames.map(user => 
-                    fetch(`/api/get-history?username=${user}&since=${date}`).then(res => res.json())
-                ));
+        if (usernames.length === 0) return;
 
-                const allMovies = [];
-                const watchCounts = {}; // { Title: count }
-                const userTotals = {}; // { User: count }
-                const ratings = {}; // { Title: [ratings] }
+        btn.disabled = true;
+        btn.innerText = "Processing Group Data...";
 
-                results.forEach((userData, index) => {
-                    const user = usernames[index];
-                    userTotals[user] = userData.length;
+        try {
+            const results = await Promise.all(usernames.map(user => 
+                fetch(`/api/get-history?username=${user}&since=${date}`).then(res => res.json())
+            ));
 
-                    userData.forEach(movie => {
-                        const title = movie.letterboxd_filmtitle || movie.title;
-                        allMovies.push({...movie, user_owner: user});
-                        
-                        watchCounts[title] = (watchCounts[title] || 0) + 1;
-                        
-                        if(movie.letterboxd_memberrating) {
-                            if(!ratings[title]) ratings[title] = [];
-                            ratings[title].push(parseFloat(movie.letterboxd_memberrating));
-                        }
-                    });
+            const watchCounts = {}; 
+            const ratingsMap = {}; // { Title: [4, 5, 3] }
+
+            results.forEach((userData) => {
+                userData.forEach(movie => {
+                    const title = movie.letterboxd_filmtitle || movie.title;
+                    
+                    // Count watches
+                    watchCounts[title] = (watchCounts[title] || 0) + 1;
+                    
+                    // Collect ratings
+                    if(movie.letterboxd_memberrating) {
+                        const val = parseFloat(movie.letterboxd_memberrating);
+                        if(!ratingsMap[title]) ratingsMap[title] = [];
+                        ratingsMap[title].push(val);
+                    }
                 });
-
-                processStats(allMovies, watchCounts, userTotals, ratings);
-                document.getElementById('dashboard').classList.remove('hidden');
-            } catch (err) {
-                console.error(err);
-            } finally {
-                btn.disabled = false;
-                btn.innerText = "Generate Report";
-            }
-        }
-
-        function processStats(movies, counts, users, ratings) {
-            // 1. Most Watched
-            const sortedCounts = Object.entries(counts).sort((a,b) => b[1] - a[1]);
-            document.getElementById('topMovie').innerText = sortedCounts[0] ? `${sortedCounts[0][0]} (${sortedCounts[0][1]} watches)` : "N/A";
-
-            // 2. Highest Rated (Average of at least 1 watch)
-            const averages = Object.entries(ratings).map(([title, scores]) => ({
-                title,
-                avg: scores.reduce((a,b) => a+b, 0) / scores.length
-            })).sort((a,b) => b.avg - a.avg);
-            document.getElementById('highestRated').innerText = averages[0] ? `${averages[0].title} (${averages[0].avg.toFixed(1)}★)` : "N/A";
-
-            // 3. Watcher Stats
-            const watcherDiv = document.getElementById('watcherStats');
-            watcherDiv.innerHTML = Object.entries(users).sort((a,b) => b[1] - a[1]).map(([name, count]) => `
-                <div class="flex justify-between items-center bg-gray-700/50 p-3 rounded">
-                    <span class="font-bold text-green-400">${name}</span>
-                    <span class="text-sm">${count} films</span>
-                </div>
-            `).join('');
-
-            // 4. Genre Chart (Since RSS doesn't have genres, we'll display "Ratings Spread" instead)
-            renderChart(movies);
-        }
-
-        function renderChart(movies) {
-            const ctx = document.getElementById('genreChart').getContext('2d');
-            const ratingData = { '5★': 0, '4★': 0, '3★': 0, '2★': 0, '1★': 0 };
-            
-            movies.forEach(m => {
-                const r = Math.floor(parseFloat(m.letterboxd_memberrating || 0));
-                if (r > 0) ratingData[`${r}★`] += 1;
             });
 
-            if (myChart) myChart.destroy();
-            myChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: Object.keys(ratingData),
-                    datasets: [{
-                        data: Object.values(ratingData),
-                        backgroundColor: ['#22c55e', '#84cc16', '#eab308', '#f97316', '#ef4444'],
-                        borderWidth: 0
-                    }]
-                },
-                options: { plugins: { legend: { position: 'bottom', labels: { color: '#9ca3af' } } } }
+            // Calculate Averages
+            const aggregatedStats = Object.keys(watchCounts).map(title => {
+                const scores = ratingsMap[title] || [];
+                return {
+                    title: title,
+                    watchCount: watchCounts[title],
+                    avgRating: scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length) : null
+                };
             });
+
+            displayStats(aggregatedStats);
+            document.getElementById('dashboard').classList.remove('hidden');
+        } catch (err) {
+            console.error(err);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "Generate Report";
         }
-    </script>
-</body>
-</html>
+    }
+
+    function displayStats(stats) {
+        // 1. Sort for Ratings (Filter out movies with no ratings)
+        const ratedMovies = stats.filter(s => s.avgRating !== null)
+                                .sort((a, b) => b.avgRating - a.avgRating);
+        
+        // 2. Sort for Watched
+        const watchedMovies = [...stats].sort((a, b) => b.watchCount - a.watchCount);
+
+        // UI: Top Highlight Cards
+        document.getElementById('highestRated').innerText = ratedMovies[0]?.title || "N/A";
+        document.getElementById('topMovie').innerText = watchedMovies[0]?.title || "N/A";
+
+        // UI: Top 5 Rated
+        renderList('top5Rated', ratedMovies.slice(0, 5), 'avgRating', '★');
+        
+        // UI: Bottom 5 Rated
+        const bottom5 = [...ratedMovies].reverse().slice(0, 5);
+        renderList('bottom5Rated', bottom5, 'avgRating', '★');
+
+        // UI: Top 5 Watched
+        renderList('top5Watched', watchedMovies.slice(0, 5), 'watchCount', ' watches');
+    }
+
+    function renderList(elementId, data, key, unit) {
+        const container = document.getElementById(elementId);
+        container.innerHTML = data.map((item, i) => `
+            <div class="flex justify-between items-center bg-gray-700/30 p-2 rounded border-l-2 ${elementId.includes('top') ? 'border-green-500' : 'border-red-500'}">
+                <span class="truncate pr-2"><span class="text-gray-500 mr-2">${i+1}.</span>${item.title}</span>
+                <span class="font-mono font-bold whitespace-nowrap text-green-400">
+                    ${key === 'avgRating' ? item[key].toFixed(1) : item[key]}${unit}
+                </span>
+            </div>
+        `).join('') || '<p class="text-gray-500 italic">No data found</p>';
+    }
+</script>
