@@ -97,12 +97,12 @@
                 const results = await Promise.all(usernames.map(user => 
                     fetch(`/api/get-history?username=${user}&since=${date}`).then(res => res.json())
                 ));
+                console.log(results)
 
                 const watchCounts = {}; 
                 const ratingsMap = {};
                 results.forEach((userData) => {
                     userData.forEach(movie => {
-                        console.log(movie)
                         const title = movie.letterboxd_filmtitle || movie.title;
                         watchCounts[title] = (watchCounts[title] || 0) + 1;
                         
