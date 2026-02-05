@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Letterboxd History Fetcher</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen p-8">
+    <div class="max-w-3xl mx-auto">
+        <h1 class="text-3xl font-bold mb-6 text-green-400">Watch History Filter</h1>
+        
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-8 flex flex-col md:flex-row gap-4">
+            <input id="username" type="text" placeholder="Username" 
+                   class="bg-gray-700 p-2 rounded border border-gray-600 focus:outline-none focus:border-green-500 flex-1">
+            
+            <input id="sinceDate" type="date" 
+                   class="bg-gray-700 p-2 rounded border border-gray-600 focus:outline-none focus:border-green-500">
+            
+            <button onclick="fetchData()" id="fetchBtn"
+                    class="bg-green-600 hover:bg-green-500 px-6 py-2 rounded font-bold transition">
+                Fetch Movies
+            </button>
+        </div>
+
+        <div id="status" class="mb-4 text-gray-400"></div>
+        <div id="results" class="grid gap-4"></div>
+    </div>
+
+    <script>
+        async function fetchData() {
+            const user = document.getElementById('username').value;
+            const date = document.getElementById('sinceDate').value;
+            const resultsDiv = document.getElementById('results');
+            const status = document.getElementById('status');
+            const btn = document.getElementById('fetchBtn');
+
+            if (!user) return alert("Please enter a username");
+
+            // UI Feedback
+            status.innerText = "Fetching data...";
+            resultsDiv.innerHTML = "";
+            btn.disabled = true;
+            btn.innerText = "Loading...";
+
+            try {
+                console.log(`user=${user} since${date}`)
+                const response = await fetch(`/api/get-history?username=${user}&since=${date}`);
+                const data = await response.json();
+
+                status.innerText = `Found ${data.length} movies watched since ${date || 'the beginning'}:`;
+                
+                data.forEach(movie => {
+                    const card = document.createElement('div');
+                    card.className = "bg-gray-800 p-4 rounded border-l-4 border-green-500 flex justify-between items-center";
+                    card.innerHTML = `
+                        <div>
+                            <h3 class="font-bold text-lg">${movie.letterboxd_filmtitle || movie.title}</h3>
+                            <p class="text-sm text-gray-400">${movie.published.split(' ').slice(0, 4).join(' ')}</p>
+                        </div>
+                        <div class="text-yellow-400 font-mono">
+                            ${movie.letterboxd_memberrating || 'No Rating'}
+                        </div>
+                    `;
+                    resultsDiv.appendChild(card);
+                });
+            } catch (err) {
+                status.innerText = "Error fetching data. Check username or try again.";
+                console.error(err);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Fetch Movies";
+            }
+        }
+    </script>
+</body>
+</html>
