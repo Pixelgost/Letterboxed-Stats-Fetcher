@@ -26,7 +26,18 @@ def get_movie_details(url):
         dir_tag = soup.find('meta', attrs={'name': 'twitter:data1'})
         director = dir_tag['content'] if dir_tag else "Unknown"
         
-        genres = [a.text for a in soup.select('div.terms.genre-list a')]
+        genres = []
+        # Attempt to find genres in the JavaScript ramp tags found in your HTML
+        script_tag = soup.find('script', string=re.compile(r'window\.ramp\.custom_tags'))
+        if script_tag:
+            # Extract tags like 'thriller', 'drama' from the script block
+            matches = re.findall(r"'(.*?)'", script_tag.string)
+            # Filter out non-genre strings like film IDs or 'intl_true'
+            genres = [m for m in matches if m and not m.endswith('G') and m != 'intl_true']
+        
+        # Fallback: search for links containing /genre/ in the URL
+        if not genres:
+            genres = list(set([a.text.strip() for a in soup.find_all('a', href=re.compile(r'/genre/'))]))
         actors = [a.get_text() for a in soup.select('.cast-list a.text-slug')[:3]]
         
         data = {"director": director, "genres": genres, "actors": actors}

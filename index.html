@@ -35,16 +35,15 @@
                     <h2 class="text-sm font-black uppercase tracking-widest mb-4 text-gray-400">2. Since Date</h2>
                     <input id="sinceDate" type="date" class="w-full bg-gray-900 p-4 rounded-2xl border border-gray-700 focus:outline-none mb-6 text-sm font-bold">
 
-                    <h2 class="text-sm font-black uppercase tracking-widest mb-4 text-gray-400">3. MVP & List Threshold</h2>
+                    <h2 class="text-sm font-black uppercase tracking-widest mb-4 text-gray-400">3. Ranking Threshold</h2>
                     <div class="bg-gray-900 p-4 rounded-2xl border border-gray-700 mb-8">
                         <div class="flex justify-between mb-2">
-                            <span class="text-xs font-bold text-gray-500">Min. Watchers for Rankings</span>
+                            <span class="text-xs font-bold text-gray-500">Min. Watchers</span>
                             <span id="thresholdValue" class="text-xs font-black text-green-500">1 Person</span>
                         </div>
                         <input id="mvpThreshold" type="range" min="1" max="1" value="1" 
-                               class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500"
+                               class="w-full h-2 bg-gray-900 rounded-lg appearance-none cursor-pointer accent-green-500"
                                oninput="updateThresholdText(this.value)">
-                        <p class="text-[10px] text-gray-500 mt-2 leading-tight uppercase font-bold tracking-tighter">Only movies watched by this many people will appear in Top/Bottom lists.</p>
                     </div>
                     
                     <button onclick="fetchAllData()" id="fetchBtn" class="w-full bg-green-500 hover:bg-green-400 text-gray-900 py-5 rounded-2xl font-black uppercase tracking-widest transition-all transform hover:scale-[1.02] active:scale-95 shadow-xl shadow-green-500/20">
@@ -57,7 +56,7 @@
             <div id="dashboard" class="lg:col-span-8 space-y-8 hidden">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="bg-gray-800 p-8 rounded-3xl border border-green-500/30">
-                        <p class="text-green-500 text-xs font-black uppercase tracking-widest mb-2">Group MVP (Threshold Filtered)</p>
+                        <p class="text-green-500 text-xs font-black uppercase tracking-widest mb-2">Group MVP (Highest Avg)</p>
                         <div id="highestRated" class="text-2xl font-black text-white">--</div>
                     </div>
                     <div class="bg-gray-800 p-8 rounded-3xl border border-blue-500/30">
@@ -134,10 +133,8 @@
             const date = document.getElementById('sinceDate').value;
             const btn = document.getElementById('fetchBtn');
             const status = document.getElementById('status');
-            
-            if (usernames.length === 0) return alert("Add at least one user.");
 
-            updateSliderMax();
+            if (usernames.length === 0) return alert("Add at least one user.");
 
             btn.disabled = true;
             status.innerText = "Syncing with Letterboxd...";
@@ -176,17 +173,13 @@
                     watcherCount: m.watchers.size
                 }));
 
-                if (statsArray.length === 0) {
-                    status.innerText = "No activity found.";
-                    return;
-                }
-                console.log(genreCounts)
-
-                renderDashboard(statsArray, genreCounts, directorCounts, actorCounts);
+                // UNHIDE dashboard BEFORE rendering to fix Chart.js canvas issues
                 document.getElementById('dashboard').classList.remove('hidden');
+                
+                renderDashboard(statsArray, genreCounts, directorCounts, actorCounts);
                 status.innerText = "Analysis Complete.";
             } catch (err) {
-                status.innerText = "Error. Check Vercel logs.";
+                status.innerText = "Error fetching data.";
                 console.error(err);
             } finally {
                 btn.disabled = false;
@@ -196,17 +189,25 @@
         function renderDashboard(stats, genres, directors, actors) {
             const threshold = parseInt(document.getElementById('mvpThreshold').value);
             
-            // Apply threshold to ALL rankings (Top 5, Bottom 5, and MVP)
+            // Filter by threshold
             const filteredStats = stats.filter(s => s.avgRating !== null && s.watcherCount >= threshold);
             
-            const rated = [...filteredStats].sort((a, b) => b.avgRating - a.avgRating);
-            const bottomRated = [...filteredStats].sort((a, b) => a.avgRating - b.avgRating);
+            // Tiebreaker Logic: Sort by rating, then by watcherCount
+            const rated = [...filteredStats].sort((a, b) => {
+                if (b.avgRating !== a.avgRating) return b.avgRating - a.avgRating;
+                return b.watcherCount - a.watcherCount; // Tiebreaker
+            });
+
+            const bottomRated = [...filteredStats].sort((a, b) => {
+                if (a.avgRating !== b.avgRating) return a.avgRating - b.avgRating;
+                return b.watcherCount - a.watcherCount; // Tiebreaker (even for bottom, higher consensus is more "valid")
+            });
+
             const watched = [...stats].sort((a, b) => b.watchCount - a.watchCount);
 
             const topRated = rated[0];
             const mostWatched = watched[0];
 
-            // Card 1: MVP
             document.getElementById('highestRated').innerHTML = `
                 <div class="truncate">${topRated?.title || "No Matches"}</div>
                 <div class="text-sm font-bold text-green-500 mt-1">
@@ -215,7 +216,6 @@
                 </div>
             `;
 
-            // Card 2: Most Watched (Unfiltered by threshold)
             document.getElementById('topMovie').innerHTML = `
                 <div class="truncate">${mostWatched?.title || "N/A"}</div>
                 <div class="text-sm font-bold text-blue-400 mt-1">
@@ -224,17 +224,15 @@
                 </div>
             `;
 
-            // Lists (Filtered by threshold)
             renderDetailedList('top5Rated', rated.slice(0, 5), 'border-green-500', threshold);
             renderDetailedList('bottom5Rated', bottomRated.slice(0, 5), 'border-red-500', threshold);
             
-            // Side Lists (Unfiltered)
             const topDirs = Object.entries(directors).sort((a,b) => b[1] - a[1]).slice(0, 5);
             const topActs = Object.entries(actors).sort((a,b) => b[1] - a[1]).slice(0, 5);
             renderSimpleList('topDirectorsList', topDirs, 'entries');
             renderSimpleList('topActorsList', topActs, 'films');
 
-            setTimeout(() => renderChart(genres), 200);
+            renderChart(genres);
         }
 
         function renderDetailedList(id, data, borderColor, threshold) {
@@ -269,23 +267,12 @@
         }
 
         function renderChart(genreData) {
-            console.log(genreData)
             const canvas = document.getElementById('genreChart');
-            if (!canvas) return;
-            
             const ctx = canvas.getContext('2d');
             if (myChart) myChart.destroy();
 
             const sorted = Object.entries(genreData).sort((a,b) => b[1] - a[1]).slice(0, 7);
-            
-            // Fallback if no genre data exists
-            if (sorted.length === 0) {
-                ctx.font = "12px Inter";
-                ctx.fillStyle = "#6b7280";
-                ctx.textAlign = "center";
-                ctx.fillText("No genre data available", canvas.width/2, canvas.height/2);
-                return;
-            }
+            if (sorted.length === 0) return;
 
             myChart = new Chart(ctx, {
                 type: 'doughnut',
@@ -303,14 +290,7 @@
                     maintainAspectRatio: false,
                     cutout: '75%',
                     plugins: {
-                        legend: { 
-                            position: 'right', 
-                            labels: { 
-                                color: '#9ca3af', 
-                                font: { weight: 'bold', size: 11 }, 
-                                padding: 15 
-                            } 
-                        }
+                        legend: { position: 'right', labels: { color: '#9ca3af', font: { weight: 'bold', size: 11 }, padding: 15 } }
                     }
                 }
             });
