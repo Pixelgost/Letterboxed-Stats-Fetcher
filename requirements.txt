@@ -1,5 +1,6 @@
 feedparser
-python-dateutil
 beautifulsoup4
 requests
 Flask
+Flask-CORS
+python-dateutil
