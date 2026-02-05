@@ -146,13 +146,16 @@
                 
                 const movieStats = {}; 
                 const genreCounts = {};
-                const directorCounts = {};
-                const actorCounts = {};
+                
+                // Track objects for directors and actors to store both total count and unique set of watchers
+                const directorStats = {};
+                const actorStats = {};
 
                 results.flat().forEach(movie => {
                     const title = movie.title;
                     if (!title || title.toLowerCase() === 'unknown') return;
 
+                    // 1. Movie Stats Aggregation
                     if (!movieStats[title]) {
                         movieStats[title] = { title, watchCount: 0, ratings: [], watchers: new Set() };
                     }
@@ -160,11 +163,26 @@
                     movieStats[title].watchers.add(movie.user);
                     if (movie.rating) movieStats[title].ratings.push(parseFloat(movie.rating));
 
+                    // 2. Director Aggregation (Total watches vs Unique users)
                     if (movie.director && movie.director !== "Unknown") {
-                        directorCounts[movie.director] = (directorCounts[movie.director] || 0) + 1;
+                        if (!directorStats[movie.director]) {
+                            directorStats[movie.director] = { name: movie.director, totalWatches: 0, uniqueWatchers: new Set() };
+                        }
+                        directorStats[movie.director].totalWatches++;
+                        directorStats[movie.director].uniqueWatchers.add(movie.user);
                     }
+
+                    // 3. Genre Aggregation
                     movie.genres?.forEach(g => genreCounts[g] = (genreCounts[g] || 0) + 1);
-                    movie.actors?.forEach(a => actorCounts[a] = (actorCounts[a] || 0) + 1);
+
+                    // 4. Actor Aggregation (Total watches vs Unique users)
+                    movie.actors?.forEach(a => {
+                        if (!actorStats[a]) {
+                            actorStats[a] = { name: a, totalWatches: 0, uniqueWatchers: new Set() };
+                        }
+                        actorStats[a].totalWatches++;
+                        actorStats[a].uniqueWatchers.add(movie.user);
+                    });
                 });
 
                 const statsArray = Object.values(movieStats).map(m => ({
@@ -173,10 +191,9 @@
                     watcherCount: m.watchers.size
                 }));
 
-                // UNHIDE dashboard BEFORE rendering to fix Chart.js canvas issues
                 document.getElementById('dashboard').classList.remove('hidden');
                 
-                renderDashboard(statsArray, genreCounts, directorCounts, actorCounts);
+                renderDashboard(statsArray, genreCounts, directorStats, actorStats);
                 status.innerText = "Analysis Complete.";
             } catch (err) {
                 status.innerText = "Error fetching data.";
@@ -186,21 +203,19 @@
             }
         }
 
-        function renderDashboard(stats, genres, directors, actors) {
+        function renderDashboard(stats, genres, directorStats, actorStats) {
             const threshold = parseInt(document.getElementById('mvpThreshold').value);
             
-            // Filter by threshold
             const filteredStats = stats.filter(s => s.avgRating !== null && s.watcherCount >= threshold);
             
-            // Tiebreaker Logic: Sort by rating, then by watcherCount
             const rated = [...filteredStats].sort((a, b) => {
                 if (b.avgRating !== a.avgRating) return b.avgRating - a.avgRating;
-                return b.watcherCount - a.watcherCount; // Tiebreaker
+                return b.watcherCount - a.watcherCount;
             });
 
             const bottomRated = [...filteredStats].sort((a, b) => {
                 if (a.avgRating !== b.avgRating) return a.avgRating - b.avgRating;
-                return b.watcherCount - a.watcherCount; // Tiebreaker (even for bottom, higher consensus is more "valid")
+                return b.watcherCount - a.watcherCount;
             });
 
             const watched = [...stats].sort((a, b) => b.watchCount - a.watchCount);
@@ -227,8 +242,10 @@
             renderDetailedList('top5Rated', rated.slice(0, 5), 'border-green-500', threshold);
             renderDetailedList('bottom5Rated', bottomRated.slice(0, 5), 'border-red-500', threshold);
             
-            const topDirs = Object.entries(directors).sort((a,b) => b[1] - a[1]).slice(0, 5);
-            const topActs = Object.entries(actors).sort((a,b) => b[1] - a[1]).slice(0, 5);
+            // Sort directors and actors by TOTAL watches
+            const topDirs = Object.values(directorStats).sort((a,b) => b.totalWatches - a.totalWatches).slice(0, 5);
+            const topActs = Object.values(actorStats).sort((a,b) => b.totalWatches - a.totalWatches).slice(0, 5);
+            
             renderSimpleList('topDirectorsList', topDirs, 'entries');
             renderSimpleList('topActorsList', topActs, 'films');
 
@@ -256,14 +273,26 @@
             `).join('');
         }
 
+        // Updated to handle object data and show total vs unique watchers
         function renderSimpleList(id, data, label) {
             const el = document.getElementById(id);
-            el.innerHTML = data.map(([name, count]) => `
-                <div class="flex justify-between items-center bg-gray-900/40 p-3 px-4 rounded-xl border border-gray-700">
-                    <span class="text-sm font-bold truncate">${name}</span>
-                    <span class="text-xs font-black text-gray-500 uppercase tracking-tighter whitespace-nowrap ml-2">${count} ${label}</span>
+            if (data.length === 0) {
+                el.innerHTML = '<p class="text-gray-600 text-xs italic">No data</p>';
+                return;
+            }
+            el.innerHTML = data.map(item => `
+                <div class="bg-gray-900/40 p-3 px-4 rounded-xl border border-gray-700">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-bold truncate">${item.name}</span>
+                        <span class="text-xs font-black text-gray-400 uppercase tracking-tighter whitespace-nowrap ml-2">
+                            ${item.totalWatches} ${label}
+                        </span>
+                    </div>
+                    <div class="text-[9px] uppercase tracking-widest font-bold text-gray-600 mt-1">
+                        Watched by ${item.uniqueWatchers.size} ${item.uniqueWatchers.size === 1 ? 'person' : 'people'}
+                    </div>
                 </div>
-            `).join('') || '<p class="text-gray-600 text-xs italic">No data</p>';
+            `).join('');
         }
 
         function renderChart(genreData) {

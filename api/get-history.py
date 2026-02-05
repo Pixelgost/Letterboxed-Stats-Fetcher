@@ -38,6 +38,8 @@ def get_movie_details(url):
         # Fallback: search for links containing /genre/ in the URL
         if not genres:
             genres = list(set([a.text.strip() for a in soup.find_all('a', href=re.compile(r'/genre/'))]))
+        cleaned_genres = [tag for tag in genres if "intl_" not in tag and not tag.endswith('G')]
+        genres = cleaned_genres
         actors = [a.get_text() for a in soup.select('.cast-list a.text-slug')[:3]]
         
         data = {"director": director, "genres": genres, "actors": actors}
