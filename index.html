@@ -18,7 +18,7 @@
     <div class="max-w-6xl mx-auto">
         <header class="mb-12">
             <h1 class="text-5xl font-black text-green-400 italic uppercase tracking-tighter">Squad Stats</h1>
-            <p class="text-gray-500 font-medium">Letterboxd Aggregate Intelligence</p>
+            <p class="text-gray-500 font-medium tracking-wide">Letterboxd Aggregate Intelligence</p>
         </header>
         
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -111,57 +111,56 @@
             if (usernames.length === 0) return alert("Add at least one user.");
 
             btn.disabled = true;
-            status.innerText = "Crunching squad data...";
+            status.innerText = "Syncing with Letterboxd...";
 
             try {
+                // Fetching from Vercel API path
                 const results = await Promise.all(usernames.map(user => 
                     fetch(`/api/get-history?username=${user}&since=${date}`).then(res => res.json())
                 ));
-
-                console.log(results)
 
                 const movieStats = {}; 
                 const genreCounts = {};
                 const directorCounts = {};
                 const actorCounts = {};
 
-                // Process every single entry
+                // Flatten results and process every entry
                 results.flat().forEach(movie => {
                     const title = movie.title;
                     if (!title || title.toLowerCase() === 'unknown') return;
 
-                    // Aggregate Movie Stats
+                    // Movie Aggregation
                     if (!movieStats[title]) {
-                        movieStats[title] = { title, watchCount: 0, ratings: [] };
+                        movieStats[title] = { title, watchCount: 0, ratings: [], watchers: new Set() };
                     }
                     movieStats[title].watchCount++;
+                    movieStats[title].watchers.add(movie.user);
                     if (movie.rating) movieStats[title].ratings.push(parseFloat(movie.rating));
 
-                    // Aggregate Directors (Counting every entry/watch)
+                    // Director/Actor Aggregation (Counts every instance)
                     if (movie.director && movie.director !== "Unknown") {
                         directorCounts[movie.director] = (directorCounts[movie.director] || 0) + 1;
                     }
-
-                    // Aggregate Actors & Genres
-                    movie.genres.forEach(g => genreCounts[g] = (genreCounts[g] || 0) + 1);
-                    movie.actors.forEach(a => actorCounts[a] = (actorCounts[a] || 0) + 1);
+                    movie.genres?.forEach(g => genreCounts[g] = (genreCounts[g] || 0) + 1);
+                    movie.actors?.forEach(a => actorCounts[a] = (actorCounts[a] || 0) + 1);
                 });
 
                 const statsArray = Object.values(movieStats).map(m => ({
                     ...m,
-                    avgRating: m.ratings.length ? (m.ratings.reduce((a, b) => a + b, 0) / m.ratings.length) : null
+                    avgRating: m.ratings.length ? (m.ratings.reduce((a, b) => a + b, 0) / m.ratings.length) : null,
+                    watcherCount: m.watchers.size
                 }));
 
                 if (statsArray.length === 0) {
-                    status.innerText = "No results found.";
+                    status.innerText = "No activity found.";
                     return;
                 }
 
                 renderDashboard(statsArray, genreCounts, directorCounts, actorCounts);
                 document.getElementById('dashboard').classList.remove('hidden');
-                status.innerText = "Done.";
+                status.innerText = "Analysis Complete.";
             } catch (err) {
-                status.innerText = "Error fetching data.";
+                status.innerText = "404 or Connection Error. Check Vercel logs.";
                 console.error(err);
             } finally {
                 btn.disabled = false;
@@ -172,40 +171,43 @@
             const rated = stats.filter(s => s.avgRating !== null).sort((a, b) => b.avgRating - a.avgRating);
             const watched = [...stats].sort((a, b) => b.watchCount - a.watchCount);
 
-            // Update Top Cards
             const topRated = rated[0];
             const mostWatched = watched[0];
 
+            // Update Cards with Watcher Details
             document.getElementById('highestRated').innerHTML = `
-                ${topRated?.title || "N/A"} 
-                <span class="text-green-500 block text-sm mt-1">${topRated ? topRated.avgRating.toFixed(1) + ' Avg Rating' : ''}</span>
+                <div class="truncate">${topRated?.title || "N/A"}</div>
+                <div class="text-sm font-bold text-green-500 mt-1">
+                    ${topRated ? topRated.avgRating.toFixed(1) + ' ★ avg' : ''} 
+                    <span class="text-gray-500 font-normal ml-1">(${topRated?.ratings.length} ratings)</span>
+                </div>
             `;
             document.getElementById('topMovie').innerHTML = `
-                ${mostWatched?.title || "N/A"} 
-                <span class="text-blue-400 block text-sm mt-1">${mostWatched ? mostWatched.watchCount + ' Watches Total' : ''}</span>
+                <div class="truncate">${mostWatched?.title || "N/A"}</div>
+                <div class="text-sm font-bold text-blue-400 mt-1">
+                    ${mostWatched ? mostWatched.watchCount + ' total watches' : ''}
+                    <span class="text-gray-500 font-normal ml-1">(${mostWatched?.watcherCount} people)</span>
+                </div>
             `;
 
-            // Rankings
             renderList('top5Rated', rated.slice(0, 5), 'avgRating', '★');
             renderList('bottom5Rated', [...rated].reverse().slice(0, 5), 'avgRating', '★');
             
-            // Cast/Crew (Counting Entries)
             const topDirs = Object.entries(directors).sort((a,b) => b[1] - a[1]).slice(0, 5);
             const topActs = Object.entries(actors).sort((a,b) => b[1] - a[1]).slice(0, 5);
             
             renderSimpleList('topDirectorsList', topDirs, 'entries');
             renderSimpleList('topActorsList', topActs, 'films');
 
-            // Chart Rendering
             setTimeout(() => renderChart(genres), 200);
         }
 
         function renderList(id, data, key, unit) {
             const el = document.getElementById(id);
-            el.innerHTML = data.map((item, i) => `
+            el.innerHTML = data.map(item => `
                 <div class="flex justify-between items-center bg-gray-900/50 p-4 rounded-2xl border-l-4 ${id.includes('top5') ? 'border-green-500' : 'border-red-500'}">
                     <span class="text-sm font-black truncate pr-4">${item.title}</span>
-                    <span class="text-sm font-mono font-black text-gray-400">
+                    <span class="text-sm font-mono font-black text-gray-400 whitespace-nowrap">
                         ${item[key].toFixed(1)}${unit}
                     </span>
                 </div>
@@ -216,8 +218,8 @@
             const el = document.getElementById(id);
             el.innerHTML = data.map(([name, count]) => `
                 <div class="flex justify-between items-center bg-gray-900/40 p-3 px-4 rounded-xl border border-gray-700">
-                    <span class="text-sm font-bold">${name}</span>
-                    <span class="text-xs font-black text-gray-500 uppercase tracking-tighter">${count} ${label}</span>
+                    <span class="text-sm font-bold truncate">${name}</span>
+                    <span class="text-xs font-black text-gray-500 uppercase tracking-tighter whitespace-nowrap ml-2">${count} ${label}</span>
                 </div>
             `).join('') || '<p class="text-gray-600 text-xs italic">No data</p>';
         }
@@ -225,9 +227,7 @@
         function renderChart(genreData) {
             const ctx = document.getElementById('genreChart').getContext('2d');
             if (myChart) myChart.destroy();
-
             const sorted = Object.entries(genreData).sort((a,b) => b[1] - a[1]).slice(0, 7);
-
             myChart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
@@ -236,18 +236,15 @@
                         data: sorted.map(g => g[1]),
                         backgroundColor: ['#4ade80', '#60a5fa', '#f87171', '#fbbf24', '#a78bfa', '#2dd4bf', '#f472b6'],
                         borderWidth: 0,
-                        hoverOffset: 20
+                        hoverOffset: 15
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    cutout: '80%',
+                    cutout: '75%',
                     plugins: {
-                        legend: {
-                            position: 'right',
-                            labels: { color: '#9ca3af', font: { weight: 'bold', size: 12 }, padding: 20 }
-                        }
+                        legend: { position: 'right', labels: { color: '#9ca3af', font: { weight: 'bold', size: 11 }, padding: 15 } }
                     }
                 }
             });
