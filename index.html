@@ -118,7 +118,8 @@
                 const results = await Promise.all(usernames.map(user => 
                     fetch(`/api/get-history?username=${user}&since=${date}`).then(res => res.json())
                 ));
-
+                
+                console.log(results)
                 const movieStats = {}; 
                 const genreCounts = {};
                 const directorCounts = {};
