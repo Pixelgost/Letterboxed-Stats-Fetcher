@@ -131,6 +131,7 @@
             } catch (err) {
                 status.innerText = "Error: Check API or Usernames.";
                 console.error(err);
+                console.log(err)
             } finally {
                 btn.disabled = false;
                 btn.innerText = "Generate Report";
