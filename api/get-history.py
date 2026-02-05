@@ -71,6 +71,7 @@ def get_history():
 
         # Clean Title Logic
         title = getattr(entry, 'letterboxd_filmtitle', entry.title)
+        print(title)
         title = re.sub(r', \d{4} - ★+.*$', '', title).replace('Watched by ', '').strip()
         
         if not title or title.lower() == "unknown":
