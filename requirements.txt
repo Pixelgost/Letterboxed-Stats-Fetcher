@@ -4,4 +4,3 @@ requests
 Flask
 Flask-CORS
 python-dateutil
-collections
