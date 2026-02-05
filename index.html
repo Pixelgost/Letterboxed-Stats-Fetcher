@@ -35,15 +35,16 @@
                     <h2 class="text-sm font-black uppercase tracking-widest mb-4 text-gray-400">2. Since Date</h2>
                     <input id="sinceDate" type="date" class="w-full bg-gray-900 p-4 rounded-2xl border border-gray-700 focus:outline-none mb-6 text-sm font-bold">
 
-                    <h2 class="text-sm font-black uppercase tracking-widest mb-4 text-gray-400">3. MVP Threshold</h2>
+                    <h2 class="text-sm font-black uppercase tracking-widest mb-4 text-gray-400">3. MVP & List Threshold</h2>
                     <div class="bg-gray-900 p-4 rounded-2xl border border-gray-700 mb-8">
                         <div class="flex justify-between mb-2">
-                            <span class="text-xs font-bold text-gray-500">Min. Watchers</span>
+                            <span class="text-xs font-bold text-gray-500">Min. Watchers for Rankings</span>
                             <span id="thresholdValue" class="text-xs font-black text-green-500">1 Person</span>
                         </div>
-                        <input id="mvpThreshold" type="range" min="1" max="5" value="1" 
+                        <input id="mvpThreshold" type="range" min="1" max="1" value="1" 
                                class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500"
-                               oninput="document.getElementById('thresholdValue').innerText = this.value + (this.value > 1 ? ' People' : ' Person')">
+                               oninput="updateThresholdText(this.value)">
+                        <p class="text-[10px] text-gray-500 mt-2 leading-tight uppercase font-bold tracking-tighter">Only movies watched by this many people will appear in Top/Bottom lists.</p>
                     </div>
                     
                     <button onclick="fetchAllData()" id="fetchBtn" class="w-full bg-green-500 hover:bg-green-400 text-gray-900 py-5 rounded-2xl font-black uppercase tracking-widest transition-all transform hover:scale-[1.02] active:scale-95 shadow-xl shadow-green-500/20">
@@ -56,7 +57,7 @@
             <div id="dashboard" class="lg:col-span-8 space-y-8 hidden">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="bg-gray-800 p-8 rounded-3xl border border-green-500/30">
-                        <p class="text-green-500 text-xs font-black uppercase tracking-widest mb-2">Group MVP (Highest Avg)</p>
+                        <p class="text-green-500 text-xs font-black uppercase tracking-widest mb-2">Group MVP (Threshold Filtered)</p>
                         <div id="highestRated" class="text-2xl font-black text-white">--</div>
                     </div>
                     <div class="bg-gray-800 p-8 rounded-3xl border border-blue-500/30">
@@ -100,16 +101,31 @@
     <script>
         let myChart = null;
 
+        function updateThresholdText(val) {
+            document.getElementById('thresholdValue').innerText = val + (val > 1 ? ' People' : ' Person');
+        }
+
+        function updateSliderMax() {
+            const usernamesCount = document.querySelectorAll('.username-input').length;
+            const slider = document.getElementById('mvpThreshold');
+            slider.max = usernamesCount || 1;
+            if (parseInt(slider.value) > usernamesCount) {
+                slider.value = usernamesCount || 1;
+                updateThresholdText(slider.value);
+            }
+        }
+
         function addInput() {
             const container = document.getElementById('userInputsContainer');
             const div = document.createElement('div');
             div.className = "flex gap-2";
             div.innerHTML = `
                 <input type="text" placeholder="Username" class="username-input bg-gray-900 p-4 rounded-2xl border border-gray-700 focus:outline-none focus:border-green-500 flex-1 text-sm font-bold">
-                <button onclick="this.parentElement.remove()" class="bg-red-900/20 text-red-500 hover:bg-red-900/40 px-5 rounded-2xl transition">×</button>
+                <button onclick="this.parentElement.remove(); updateSliderMax();" class="bg-red-900/20 text-red-500 hover:bg-red-900/40 px-5 rounded-2xl transition">×</button>
             `;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
+            updateSliderMax();
         }
 
         async function fetchAllData() {
@@ -118,12 +134,10 @@
             const date = document.getElementById('sinceDate').value;
             const btn = document.getElementById('fetchBtn');
             const status = document.getElementById('status');
-            const thresholdInput = document.getElementById('mvpThreshold');
-
+            
             if (usernames.length === 0) return alert("Add at least one user.");
 
-            // Update slider max based on number of users added
-            thresholdInput.max = usernames.length;
+            updateSliderMax();
 
             btn.disabled = true;
             status.innerText = "Syncing with Letterboxd...";
@@ -181,24 +195,26 @@
         function renderDashboard(stats, genres, directors, actors) {
             const threshold = parseInt(document.getElementById('mvpThreshold').value);
             
-            // MVP calculation based on threshold
-            const mvpCandidates = stats.filter(s => s.avgRating !== null && s.watcherCount >= threshold)
-                                       .sort((a, b) => b.avgRating - a.avgRating);
+            // Apply threshold to ALL rankings (Top 5, Bottom 5, and MVP)
+            const filteredStats = stats.filter(s => s.avgRating !== null && s.watcherCount >= threshold);
             
-            const rated = stats.filter(s => s.avgRating !== null).sort((a, b) => b.avgRating - a.avgRating);
+            const rated = [...filteredStats].sort((a, b) => b.avgRating - a.avgRating);
+            const bottomRated = [...filteredStats].sort((a, b) => a.avgRating - b.avgRating);
             const watched = [...stats].sort((a, b) => b.watchCount - a.watchCount);
 
-            const topRated = mvpCandidates[0];
+            const topRated = rated[0];
             const mostWatched = watched[0];
 
-            // Update Top Cards
+            // Card 1: MVP
             document.getElementById('highestRated').innerHTML = `
-                <div class="truncate">${topRated?.title || "No Match"}</div>
+                <div class="truncate">${topRated?.title || "No Matches"}</div>
                 <div class="text-sm font-bold text-green-500 mt-1">
-                    ${topRated ? topRated.avgRating.toFixed(1) + ' ★ avg' : 'Adjust threshold'} 
+                    ${topRated ? topRated.avgRating.toFixed(1) + ' ★ avg' : `Need ${threshold}+ watchers`} 
                     <span class="text-gray-500 font-normal ml-1">${topRated ? '(' + topRated.ratings.length + ' ratings)' : ''}</span>
                 </div>
             `;
+
+            // Card 2: Most Watched (Unfiltered by threshold)
             document.getElementById('topMovie').innerHTML = `
                 <div class="truncate">${mostWatched?.title || "N/A"}</div>
                 <div class="text-sm font-bold text-blue-400 mt-1">
@@ -207,21 +223,25 @@
                 </div>
             `;
 
-            // Render Lists with Detailed Watcher Info
-            renderDetailedList('top5Rated', rated.slice(0, 5), 'border-green-500');
-            renderDetailedList('bottom5Rated', [...rated].reverse().slice(0, 5), 'border-red-500');
+            // Lists (Filtered by threshold)
+            renderDetailedList('top5Rated', rated.slice(0, 5), 'border-green-500', threshold);
+            renderDetailedList('bottom5Rated', bottomRated.slice(0, 5), 'border-red-500', threshold);
             
+            // Side Lists (Unfiltered)
             const topDirs = Object.entries(directors).sort((a,b) => b[1] - a[1]).slice(0, 5);
             const topActs = Object.entries(actors).sort((a,b) => b[1] - a[1]).slice(0, 5);
-            
             renderSimpleList('topDirectorsList', topDirs, 'entries');
             renderSimpleList('topActorsList', topActs, 'films');
 
             setTimeout(() => renderChart(genres), 200);
         }
 
-        function renderDetailedList(id, data, borderColor) {
+        function renderDetailedList(id, data, borderColor, threshold) {
             const el = document.getElementById(id);
+            if (data.length === 0) {
+                el.innerHTML = `<p class="text-gray-600 text-xs italic p-4 bg-gray-900/20 rounded-2xl">No movies meet the ${threshold} person threshold.</p>`;
+                return;
+            }
             el.innerHTML = data.map(item => `
                 <div class="bg-gray-900/50 p-4 rounded-2xl border-l-4 ${borderColor}">
                     <div class="flex justify-between items-start">
@@ -234,7 +254,7 @@
                         ${item.watchCount} total watches (${item.watcherCount} ${item.watcherCount === 1 ? 'person' : 'people'})
                     </div>
                 </div>
-            `).join('') || '<p class="text-gray-600 text-xs italic">No data</p>';
+            `).join('');
         }
 
         function renderSimpleList(id, data, label) {
