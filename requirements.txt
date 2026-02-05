@@ -1,2 +1,4 @@
 feedparser
 python-dateutil
+beautifulsoup4
+requests
