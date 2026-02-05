@@ -103,12 +103,17 @@
                 const ratingsMap = {};
                 results.forEach((userData) => {
                     userData.forEach(movie => {
-                        const title = movie.letterboxd_filmtitle || movie.title;
+                        // Try multiple possible keys to find the title
+                        const title = movie.title || movie.letterboxd_filmtitle;
+                        if (!title) return; // Skip if no title found
+
                         watchCounts[title] = (watchCounts[title] || 0) + 1;
                         
-                        if(movie.letterboxd_memberrating) {
-                            const val = parseFloat(movie.letterboxd_memberrating);
-                            if(!ratingsMap[title]) ratingsMap[title] = [];
+                        // Look for rating in either key
+                        const rawRating = movie.rating || movie.letterboxd_memberrating;
+                        if (rawRating) {
+                            const val = parseFloat(rawRating);
+                            if (!ratingsMap[title]) ratingsMap[title] = [];
                             ratingsMap[title].push(val);
                         }
                     });
