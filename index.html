@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Letterboxd History Fetcher</title>
+    <title>Group Letterboxed Stats!</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* Custom scrollbar for a cleaner dark look */
@@ -93,7 +93,9 @@
                     userData.forEach(movie => {
                         movie.user_owner = usernames[index];
                         combinedData.push(movie);
+                        console.log(movie)
                     });
+                    
                 });
 
                 // Sort combined data by date (newest first)
